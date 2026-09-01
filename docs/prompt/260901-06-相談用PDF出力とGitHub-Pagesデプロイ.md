@@ -36,6 +36,8 @@
 
 公開URL:https://adash333.github.io/laborlog/
 
+※Pagesの有効化(Settings → Pages → gh-pages ブランチ)のみ手動操作が必要だった。有効化後、本番URLで index.html・JS・CSS・PWA manifest・service worker がすべて配信されていることを確認済み(公開確認:2026-09-01)。
+
 Vite は相対パス(`base: './'`)+HashRouter 構成のため、サブパス配信でもそのまま動作する。
 
 ### 検証
