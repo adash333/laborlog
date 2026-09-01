@@ -11,11 +11,19 @@ import rules from '../scoring/rules.json'
 export default function Risk() {
   const [month, setMonth] = useState(monthOf(localDateString()))
   const days = useLiveQuery(() => db.workdays.where('date').startsWith(month).toArray(), [month])
+  const incidents = useLiveQuery(
+    () => db.incidents.where('date').startsWith(month).toArray(),
+    [month],
+  )
+  const monthlyInput = useLiveQuery(
+    async () => (await db.monthlyInputs.get(month)) ?? null,
+    [month],
+  )
   const profile = useLiveQuery(() => db.profile.get(1), [])
 
-  if (days === undefined) return null
+  if (days === undefined || incidents === undefined || monthlyInput === undefined) return null
   const agg = aggregateMonth(month, days)
-  const risk = assessMonth(agg)
+  const risk = assessMonth(agg, incidents, monthlyInput)
   const levelInfo = LEVEL_LABELS[risk.screenLevel]
   const confidence = dataConfidence(agg.recordedDays)
   const hasScheduleException =
@@ -68,21 +76,33 @@ export default function Risk() {
 
       <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-bold">総合評価(参考値)</h2>
+          <h2 className="text-sm font-bold">総合ブラック度</h2>
           <span className="text-sm font-bold">{levelInfo.label}</span>
         </div>
         <p className="mt-1 text-3xl font-bold tabular-nums text-brand">
-          {risk.availableScore}
-          <span className="text-base font-normal text-slate-500"> / {risk.availableMax}</span>
+          {risk.totalScore}
+          <span className="text-base font-normal text-slate-500"> / 100</span>
         </p>
         <p className="mt-2 text-sm text-slate-600">{levelInfo.message}</p>
-        <p className="mt-2 text-xs text-slate-500">
-          現在は「長時間労働(30点)」「休憩・休日(15点)」のみ評価しています。未払い(25点)・ハラスメント(20点)・雇用上の圧力(10点)は今後のアップデートで追加されます。
-        </p>
       </section>
 
-      <CategoryCard title="長時間労働・過重労働" cat={risk.longHours} />
-      <CategoryCard title="休憩・休日" cat={risk.breaksHolidays} />
+      <CategoryCard title="長時間労働・過重労働(30点)" cat={risk.longHours} />
+      <CategoryCard title="未払い・勤務記録差異(25点)" cat={risk.unpaid}>
+        <Link to={`/report/${month}`} className="text-xs text-brand underline">
+          会社側の残業時間を入力する →
+        </Link>
+      </CategoryCard>
+      <CategoryCard title="ハラスメント(20点)" cat={risk.harassment}>
+        <Link to="/incidents" className="text-xs text-brand underline">
+          出来事を記録・確認する →
+        </Link>
+      </CategoryCard>
+      <CategoryCard title="休憩・休日(15点)" cat={risk.breaksHolidays} />
+      <CategoryCard title="雇用上の圧力・退職妨害(10点)" cat={risk.pressure}>
+        <Link to={`/report/${month}`} className="text-xs text-brand underline">
+          該当項目をチェックする →
+        </Link>
+      </CategoryCard>
 
       <section className="rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="mb-2 text-sm font-bold">なぜこの点数?</h2>
@@ -116,22 +136,38 @@ export default function Risk() {
   )
 }
 
-function CategoryCard({ title, cat }: { title: string; cat: CategoryScore }) {
+function CategoryCard({
+  title,
+  cat,
+  children,
+}: {
+  title: string
+  cat: CategoryScore
+  children?: React.ReactNode
+}) {
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm">
-      <h2 className="mb-2 text-sm font-bold">{title}</h2>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-bold">{title}</h2>
+        {cat.insufficient && (
+          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+            暫定値
+          </span>
+        )}
+      </div>
       <ScoreBar label="スコア" score={cat.score} max={cat.maxScore} />
       <p className="mt-1 text-sm text-slate-600">{cat.message}</p>
       {cat.reasons.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs text-slate-600">
           {cat.reasons.map((r) => (
-            <li key={r.label} className="flex justify-between">
+            <li key={r.label} className="flex justify-between gap-2">
               <span>{r.label}</span>
-              <span className="tabular-nums">+{r.points}点</span>
+              <span className="shrink-0 tabular-nums">+{r.points}点</span>
             </li>
           ))}
         </ul>
       )}
+      {children && <p className="mt-2">{children}</p>}
     </section>
   )
 }

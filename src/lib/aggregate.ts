@@ -19,6 +19,7 @@ export interface MonthlyAggregate {
   nightWorkDays: number
   days12hOrMore: number
   days14hOrMore: number
+  offClockMinutes: number // 始業前・終業後・自宅作業の合計(勤怠に載りにくい作業の目安)
   troubleCounts: Partial<Record<TroubleId, number>>
 }
 
@@ -36,6 +37,7 @@ export function aggregateMonth(month: string, days: WorkDay[]): MonthlyAggregate
   let nightWorkDays = 0
   let days12hOrMore = 0
   let days14hOrMore = 0
+  let offClockMinutes = 0
   const troubleCounts: Partial<Record<TroubleId, number>> = {}
 
   for (const day of sorted) {
@@ -55,6 +57,7 @@ export function aggregateMonth(month: string, days: WorkDay[]): MonthlyAggregate
       }
       if (isNightWork(day)) nightWorkDays += 1
     }
+    offClockMinutes += day.preShiftWorkMinutes + day.postShiftWorkMinutes + day.homeWorkMinutes
     if (day.holidayWork || day.troubles.includes('holiday_work')) holidayWorkDays += 1
     for (const t of day.troubles) {
       troubleCounts[t] = (troubleCounts[t] ?? 0) + 1
@@ -74,6 +77,7 @@ export function aggregateMonth(month: string, days: WorkDay[]): MonthlyAggregate
     nightWorkDays,
     days12hOrMore,
     days14hOrMore,
+    offClockMinutes,
     troubleCounts,
   }
 }

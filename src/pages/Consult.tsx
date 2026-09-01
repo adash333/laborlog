@@ -1,6 +1,13 @@
 // 相談先の案内(実装仕様書 §31–33)。利用者本人が選択できるよう、指示形ではなく選択肢として表示する。
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db'
+import { localDateString, monthOf } from '../lib/time'
+import { aggregateMonth } from '../lib/aggregate'
+import { assessMonth } from '../scoring/scoring'
+
 const SECTIONS = [
   {
+    id: 'working_hours',
     title: '労働時間・残業代について',
     contacts: [
       {
@@ -18,6 +25,7 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'harassment',
     title: 'ハラスメント・職場トラブルについて',
     contacts: [
       {
@@ -35,6 +43,7 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'employment',
     title: '退職・解雇・法的トラブルについて',
     contacts: [
       {
@@ -60,6 +69,29 @@ const SECTIONS = [
 ]
 
 export default function Consult() {
+  const month = monthOf(localDateString())
+  const days = useLiveQuery(() => db.workdays.where('date').startsWith(month).toArray(), [month])
+  const incidents = useLiveQuery(
+    () => db.incidents.where('date').startsWith(month).toArray(),
+    [month],
+  )
+  const monthlyInput = useLiveQuery(
+    async () => (await db.monthlyInputs.get(month)) ?? null,
+    [month],
+  )
+
+  // スコア条件による優先表示(実装仕様書 §31)。窓口の選択は本人に委ねる
+  const relevant = new Set<string>()
+  if (days !== undefined && incidents !== undefined && monthlyInput !== undefined) {
+    const risk = assessMonth(aggregateMonth(month, days), incidents, monthlyInput)
+    if (risk.longHours.score >= 10 || risk.unpaid.score >= 10) relevant.add('working_hours')
+    if (risk.harassment.score >= 5) relevant.add('harassment')
+    if (risk.pressure.score >= 4) relevant.add('employment')
+  }
+  const ordered = [...SECTIONS].sort(
+    (a, b) => Number(relevant.has(b.id)) - Number(relevant.has(a.id)),
+  )
+
   return (
     <div className="space-y-4">
       <header>
@@ -69,9 +101,19 @@ export default function Consult() {
         </p>
       </header>
 
-      {SECTIONS.map((sec) => (
-        <section key={sec.title} className="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 className="mb-3 text-sm font-bold">{sec.title}</h2>
+      {ordered.map((sec) => (
+        <section
+          key={sec.title}
+          className={`rounded-2xl bg-white p-5 shadow-sm ${relevant.has(sec.id) ? 'ring-2 ring-brand/40' : ''}`}
+        >
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold">
+            {sec.title}
+            {relevant.has(sec.id) && (
+              <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
+                あなたの記録に関連
+              </span>
+            )}
+          </h2>
           <ul className="space-y-3">
             {sec.contacts.map((c) => (
               <li key={c.name} className="rounded-xl border border-slate-200 p-3">

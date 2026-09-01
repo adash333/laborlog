@@ -79,3 +79,73 @@ export interface AuditEntry {
   at: string // 記録時刻 ISO8601
   snapshot: string // WorkDay の JSON
 }
+
+// ハラスメント等の出来事カテゴリ(実装仕様書 §16:厚労省パワハラ6類型+セクハラ等)
+export const HARASSMENT_CATEGORIES = [
+  { id: 'physical_attack', label: '身体的な攻撃(叩かれた・蹴られた・物を投げられた等)' },
+  { id: 'mental_attack', label: '精神的な攻撃(怒鳴られた・人格否定・脅された等)' },
+  { id: 'isolation', label: '人間関係からの切り離し(無視・仲間外れ・会議から外される等)' },
+  { id: 'excessive_demand', label: '過大な要求(明らかに達成困難な仕事の強制等)' },
+  { id: 'insufficient_demand', label: '過小な要求(仕事を与えられない等)' },
+  { id: 'privacy_intrusion', label: '個の侵害(私生活への執拗な介入等)' },
+  { id: 'sexual_harassment', label: '性的な言動・接触等' },
+  { id: 'pregnancy_parental', label: '妊娠・出産・育休等に関する不利益・嫌がらせ' },
+  { id: 'other', label: 'その他' },
+] as const
+
+export type HarassmentCategory = (typeof HARASSMENT_CATEGORIES)[number]['id']
+
+// 深刻さ(実装仕様書 §17)
+export const SEVERITY_OPTIONS = [
+  { value: 1, label: '不快だった' },
+  { value: 2, label: '繰り返された・皆の前で屈辱的だった' },
+  { value: 3, label: '深刻だった(強い威圧・継続的な隔離など)' },
+  { value: 4, label: '暴力・重大な性的言動・強い脅迫があった' },
+] as const
+
+export interface Incident {
+  id?: number
+  date: string // "YYYY-MM-DD"
+  category: HarassmentCategory
+  severity: 1 | 2 | 3 | 4
+  place: string
+  actor: string // 相手(役職や呼び方でよい)
+  description: string // 出来事・実際の発言
+  witness: boolean // 目撃者がいた
+  evidence: boolean // メール・チャット等の証拠がある
+  createdAt: string
+}
+
+// 雇用上の圧力チェック項目(実装仕様書 §26)
+export const PRESSURE_ITEMS = [
+  { id: 'resignation_refused', label: '退職届を受け取ってもらえない・退職を妨げられた' },
+  { id: 'threatened_after_resignation', label: '退職を申し出た後に威圧された' },
+  { id: 'damage_claim_threat', label: '「損害賠償を請求する」などと脅された' },
+  { id: 'penalty_or_fine', label: '不合理な罰金・弁償を求められた' },
+  { id: 'retaliation_after_consultation', label: '相談・通報したことへの報復を受けた' },
+  { id: 'union_related_disadvantage', label: '労働組合に関することで不利益な扱いを受けた' },
+  { id: 'leave_related_disadvantage', label: '有休・産休・育休等を理由に不利益な扱いを受けた' },
+  { id: 'forced_illegal_action', label: '明らかな違法行為への加担を強要された' },
+  { id: 'violence_or_serious_threat', label: '暴力・重大な脅迫を受けた' },
+] as const
+
+export type PressureItemId = (typeof PRESSURE_ITEMS)[number]['id']
+
+// 月次入力(会社側の記録との比較・雇用上の圧力チェック)
+export interface MonthlyInput {
+  month: string // "YYYY-MM"(主キー)
+  companyOvertimeHours: number | null // 会社の勤怠上の残業時間
+  payslipOvertimeHours: number | null // 給与明細に記載された残業時間
+  pressureFlags: PressureItemId[]
+  updatedAt: string
+}
+
+export function emptyMonthlyInput(month: string): MonthlyInput {
+  return {
+    month,
+    companyOvertimeHours: null,
+    payslipOvertimeHours: null,
+    pressureFlags: [],
+    updatedAt: new Date().toISOString(),
+  }
+}

@@ -1,7 +1,15 @@
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { TROUBLE_ITEMS, type WorkDay } from '../types'
+import {
+  PRESSURE_ITEMS,
+  TROUBLE_ITEMS,
+  emptyMonthlyInput,
+  type MonthlyInput,
+  type PressureItemId,
+  type WorkDay,
+} from '../types'
 import { formatMinutes, recordedWorkMinutes } from '../lib/time'
 import { aggregateMonth, dataConfidence } from '../lib/aggregate'
 
@@ -95,6 +103,8 @@ export default function Report() {
         </section>
       )}
 
+      <MonthlyInputCard month={month} selfOvertimeMinutes={agg.overtimeMinutes} />
+
       <button
         onClick={downloadCsv}
         className="w-full rounded-xl border border-brand bg-white py-3 font-bold text-brand"
@@ -108,6 +118,120 @@ export default function Report() {
         推定時間外労働は「1日8時間を超えた分」の暫定推計です。変形労働時間制・フレックスタイム制等では実際の法的評価と異なる場合があり、法的な労働時間・残業代を確定するものではありません。
       </p>
     </div>
+  )
+}
+
+/** 会社側の記録との比較入力+雇用上の圧力チェック(月単位) */
+function MonthlyInputCard({
+  month,
+  selfOvertimeMinutes,
+}: {
+  month: string
+  selfOvertimeMinutes: number
+}) {
+  const stored = useLiveQuery(async () => (await db.monthlyInputs.get(month)) ?? null, [month])
+  const [input, setInput] = useState<MonthlyInput | null>(null)
+
+  useEffect(() => {
+    if (stored !== undefined) setInput(stored ?? emptyMonthlyInput(month))
+  }, [stored, month])
+
+  if (!input) return null
+
+  const save = async (next: MonthlyInput) => {
+    setInput(next)
+    await db.monthlyInputs.put({ ...next, updatedAt: new Date().toISOString() })
+  }
+
+  const togglePressure = (id: PressureItemId) => {
+    const flags = input.pressureFlags.includes(id)
+      ? input.pressureFlags.filter((f) => f !== id)
+      : [...input.pressureFlags, id]
+    save({ ...input, pressureFlags: flags })
+  }
+
+  const selfH = Math.floor(selfOvertimeMinutes / 60)
+  const diff =
+    input.companyOvertimeHours !== null
+      ? Math.max(selfOvertimeMinutes / 60 - input.companyOvertimeHours, 0)
+      : null
+
+  return (
+    <>
+      <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-bold">会社側の記録との比較</h2>
+        <p className="text-xs text-slate-600">
+          会社の勤怠システムや給与明細に記載された残業時間を入力すると、あなたの記録(推定時間外労働
+          約{selfH}時間)との差を確認できます。
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">会社の勤怠上の残業(時間/月)</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              className="input"
+              placeholder="未入力"
+              value={input.companyOvertimeHours ?? ''}
+              onChange={(e) =>
+                save({
+                  ...input,
+                  companyOvertimeHours: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium">給与明細の残業(時間/月)</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              className="input"
+              placeholder="未入力"
+              value={input.payslipOvertimeHours ?? ''}
+              onChange={(e) =>
+                save({
+                  ...input,
+                  payslipOvertimeHours: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+          </label>
+        </div>
+        {diff !== null && diff >= 1 && (
+          <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-700">
+            あなたの記録と会社側の記録に約{Math.floor(diff)}時間の差があります。
+            計算方法や勤務条件を確認してください(この表示は未払いを断定するものではありません)。
+          </p>
+        )}
+      </section>
+
+      <section className="space-y-2 rounded-2xl bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-bold">雇用上の圧力(この月に該当があればチェック)</h2>
+        <div className="space-y-1.5">
+          {PRESSURE_ITEMS.map((item) => (
+            <label key={item.id} className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={input.pressureFlags.includes(item.id)}
+                onChange={() => togglePressure(item.id)}
+              />
+              {item.label}
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">
+          具体的な経緯は
+          <Link to="/incident/new" className="text-brand underline">
+            出来事の記録
+          </Link>
+          に残しておくことをおすすめします。
+        </p>
+      </section>
+    </>
   )
 }
 

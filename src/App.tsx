@@ -4,6 +4,8 @@ import { db } from './db'
 import Home from './pages/Home'
 import Setup from './pages/Setup'
 import DayEdit from './pages/DayEdit'
+import Incidents from './pages/Incidents'
+import IncidentNew from './pages/IncidentNew'
 import Calendar from './pages/Calendar'
 import Report from './pages/Report'
 import Risk from './pages/Risk'
@@ -37,6 +39,8 @@ export default function App() {
             <Route path="/setup" element={<Setup />} />
             <Route path="/" element={<Home />} />
             <Route path="/day/:date" element={<DayEdit />} />
+            <Route path="/incidents" element={<Incidents />} />
+            <Route path="/incident/new" element={<IncidentNew />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/report/:month" element={<Report />} />
             <Route path="/risk" element={<Risk />} />

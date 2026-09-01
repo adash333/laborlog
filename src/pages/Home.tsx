@@ -32,11 +32,25 @@ export default function Home() {
     () => db.workdays.where('date').startsWith(month).toArray(),
     [month],
   )
+  const monthIncidents = useLiveQuery(
+    () => db.incidents.where('date').startsWith(month).toArray(),
+    [month],
+  )
+  const monthlyInput = useLiveQuery(
+    async () => (await db.monthlyInputs.get(month)) ?? null,
+    [month],
+  )
 
-  if (day === undefined || monthDays === undefined) return null
+  if (
+    day === undefined ||
+    monthDays === undefined ||
+    monthIncidents === undefined ||
+    monthlyInput === undefined
+  )
+    return null
 
   const agg = aggregateMonth(month, monthDays)
-  const risk = assessMonth(agg)
+  const risk = assessMonth(agg, monthIncidents, monthlyInput)
   const levelInfo = LEVEL_LABELS[risk.screenLevel]
   const work = day ? recordedWorkMinutes(day) : null
 
@@ -134,6 +148,11 @@ export default function Home() {
                 </label>
               ))}
             </div>
+            <p className="mt-2 text-xs">
+              <Link to={`/incident/new?date=${today}`} className="text-brand underline">
+                ハラスメント等の出来事を詳しく記録する →
+              </Link>
+            </p>
           </div>
         </section>
       )}
@@ -159,15 +178,23 @@ export default function Home() {
             {levelInfo.label}
           </span>
         </div>
+        <p className="mb-2 text-2xl font-bold tabular-nums text-brand">
+          {risk.totalScore}
+          <span className="text-sm font-normal text-slate-500"> / 100</span>
+        </p>
         <ScoreBar label="長時間労働" score={risk.longHours.score} max={risk.longHours.maxScore} />
+        <ScoreBar label="未払いリスク" score={risk.unpaid.score} max={risk.unpaid.maxScore} />
+        <ScoreBar
+          label="ハラスメント"
+          score={risk.harassment.score}
+          max={risk.harassment.maxScore}
+        />
         <ScoreBar
           label="休憩・休日"
           score={risk.breaksHolidays.score}
           max={risk.breaksHolidays.maxScore}
         />
-        <p className="mt-2 text-xs text-slate-500">
-          未払い・ハラスメント・雇用圧力の評価は今後のアップデートで追加されます。
-        </p>
+        <ScoreBar label="雇用上の圧力" score={risk.pressure.score} max={risk.pressure.maxScore} />
         {risk.redFlags.length > 0 && (
           <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">
             🚨 重要な注意があります。「リスク」タブで確認してください。

@@ -17,8 +17,49 @@
       "id": "mhlw_labor_standards_act",
       "name": "労働基準法(第34条 休憩・第35条 休日)",
       "url": "https://www.mhlw.go.jp/web/t_doc?dataId=73022000&dataType=0&pageNo=1"
+    },
+    {
+      "id": "mhlw_harassment",
+      "name": "厚生労働省「職場におけるハラスメントの防止のために」",
+      "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/koyoukintou/seisaku06/"
     }
   ],
+  "harassment": {
+    "maxScore": 20,
+    "eventScores": { "1": 1, "2": 3, "3": 6, "4": 10 },
+    "repeatBonus": [
+      { "minCount": 5, "bonus": 5 },
+      { "minCount": 3, "bonus": 3 }
+    ]
+  },
+  "unpaid": {
+    "maxScore": 25,
+    "differenceHours": [
+      { "minHours": 40, "score": 25 },
+      { "minHours": 20, "score": 18 },
+      { "minHours": 10, "score": 12 },
+      { "minHours": 5, "score": 6 },
+      { "minHours": 1, "score": 3 },
+      { "minHours": 0, "score": 0 }
+    ],
+    "unableToReportBonus": { "minCount": 3, "bonus": 3 },
+    "offClockBonus": { "minMinutes": 300, "bonus": 3 }
+  },
+  "pressure": {
+    "maxScore": 10,
+    "itemPoints": {
+      "resignation_refused": 4,
+      "threatened_after_resignation": 6,
+      "damage_claim_threat": 8,
+      "penalty_or_fine": 4,
+      "retaliation_after_consultation": 6,
+      "union_related_disadvantage": 4,
+      "leave_related_disadvantage": 4,
+      "forced_illegal_action": 8,
+      "violence_or_serious_threat": 10
+    },
+    "dailyTroubleBonus": 2
+  },
   "longHours": {
     "maxScore": 30,
     "overtimeBase": [
