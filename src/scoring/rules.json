@@ -1,0 +1,96 @@
+{
+  "rulesetVersion": "0.1.0",
+  "rulesetEffectiveDate": "2026-09-01",
+  "note": "暫定ルール。docs/specs/implementation-spec.md §9, §23–24 の仮スコアを転記したもの。公開前に専門家レビューを要する。すべてのルールは法的違反を確定しない(legal_claim: false)。",
+  "sources": [
+    {
+      "id": "mhlw_overtime_limit",
+      "name": "厚生労働省「時間外労働の上限規制」",
+      "url": "https://hatarakikatakaikaku.mhlw.go.jp/overtime.html"
+    },
+    {
+      "id": "mhlw_rousai_kijun",
+      "name": "厚生労働省「脳・心臓疾患の労災認定基準」",
+      "url": "https://www.mhlw.go.jp/content/11601000/000880790.pdf"
+    },
+    {
+      "id": "mhlw_labor_standards_act",
+      "name": "労働基準法(第34条 休憩・第35条 休日)",
+      "url": "https://www.mhlw.go.jp/web/t_doc?dataId=73022000&dataType=0&pageNo=1"
+    }
+  ],
+  "longHours": {
+    "maxScore": 30,
+    "overtimeBase": [
+      { "minHours": 100, "score": 30 },
+      { "minHours": 80, "score": 24 },
+      { "minHours": 60, "score": 17 },
+      { "minHours": 45, "score": 10 },
+      { "minHours": 30, "score": 5 },
+      { "minHours": 20, "score": 2 },
+      { "minHours": 0, "score": 0 }
+    ],
+    "consecutiveBonus": [
+      { "minDays": 14, "bonus": 4 },
+      { "minDays": 10, "bonus": 2 },
+      { "minDays": 7, "bonus": 1 }
+    ],
+    "longDayBonus": {
+      "day14hOnce": 3,
+      "day12hThreeTimes": 2,
+      "day12hOnce": 1
+    },
+    "nightWorkBonus": [
+      { "minDays": 8, "bonus": 2 },
+      { "minDays": 4, "bonus": 1 }
+    ]
+  },
+  "breaksHolidays": {
+    "maxScore": 15,
+    "breakDeficitDays": [
+      { "minDays": 10, "score": 6 },
+      { "minDays": 6, "score": 5 },
+      { "minDays": 3, "score": 3 },
+      { "minDays": 1, "score": 1 },
+      { "minDays": 0, "score": 0 }
+    ],
+    "consecutiveDays": [
+      { "minDays": 14, "score": 6 },
+      { "minDays": 10, "score": 4 },
+      { "minDays": 7, "score": 2 },
+      { "minDays": 0, "score": 0 }
+    ]
+  },
+  "redFlags": [
+    {
+      "ruleId": "RF_LONG_001",
+      "metric": "monthly_overtime_hours",
+      "operator": ">=",
+      "value": 100,
+      "severity": "critical",
+      "message": "今月の推定時間外労働が100時間に達しています。厚生労働省の脳・心臓疾患の労災認定基準では、発症前1か月におおむね100時間を超える時間外労働は業務との関連性が強いと評価される目安の一つです。記録を保存し、早めの外部相談を検討してください。",
+      "sourceId": "mhlw_rousai_kijun",
+      "legalClaim": false
+    },
+    {
+      "ruleId": "RF_LONG_080",
+      "metric": "monthly_overtime_hours",
+      "operator": ">=",
+      "value": 80,
+      "severity": "high",
+      "message": "高い長時間労働リスクが検出されました。厚生労働省の労災認定基準では、一定期間に月80時間を超える時間外労働がある場合、業務と発症との関連性が強いと評価される目安の一つになっています。記録を保存し、外部相談を検討してください。",
+      "sourceId": "mhlw_rousai_kijun",
+      "legalClaim": false
+    },
+    {
+      "ruleId": "RF_CONSECUTIVE_014",
+      "metric": "max_consecutive_days",
+      "operator": ">=",
+      "value": 14,
+      "severity": "high",
+      "message": "14日以上の連続勤務が記録されています。労働基準法の一般則では毎週少なくとも1回の休日が必要とされています(変形休日制等の例外があります)。勤務条件を確認し、必要に応じて相談を検討してください。",
+      "sourceId": "mhlw_labor_standards_act",
+      "legalClaim": false
+    }
+  ]
+}

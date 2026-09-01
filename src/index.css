@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #1e3a5f;
+  --color-brand-light: #2d5486;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm;
+  }
+}
