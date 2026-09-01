@@ -28,13 +28,13 @@
 
 ### GitHub Pages 自動デプロイ
 
-`.github/workflows/deploy.yml` を追加。main への push ごとに:
+`.github/workflows/deploy.yml` を追加。main への push ごとに `npm ci` → `npm test`(49件)→ `npm run build` → `dist/` を `gh-pages` ブランチへ publish(peaceiris/actions-gh-pages)。
 
-1. `npm ci` → `npm test`(49件)→ `npm run build`
-2. `actions/configure-pages@v5`(`enablement: true` で Pages を自動有効化)
-3. `dist/` を `actions/deploy-pages@v4` でデプロイ
+- 当初は `actions/configure-pages`(enablement)+`deploy-pages` 方式を試したが、標準の GITHUB_TOKEN では Pages サイト作成の権限がなく失敗(`Resource not accessible by integration`)
+- そのため **gh-pages ブランチ方式**に切り替え。gh-pages ブランチの作成で GitHub が Pages を自動有効化するため、手動設定が不要
+- 初回はローカルビルドを gh-pages に直接 push して公開を開始した(gh-pages はデプロイ成果物専用ブランチ。開発はすべて main)
 
-公開URL(想定):https://adash333.github.io/laborlog/
+公開URL:https://adash333.github.io/laborlog/
 
 Vite は相対パス(`base: './'`)+HashRouter 構成のため、サブパス配信でもそのまま動作する。
 
