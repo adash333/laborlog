@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
+import type { WorkDay } from '../types'
 import { db, saveWorkDay } from '../db'
 import { TROUBLE_ITEMS, emptyWorkDay, type TroubleId } from '../types'
 import {
@@ -136,6 +138,17 @@ export default function Home() {
         </section>
       )}
 
+      {/* 自由メモ(記録がある日はいつでも書ける) */}
+      {day?.clockIn && (
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="mb-2 text-sm font-bold">自由メモ</h2>
+          <MemoField day={day} />
+          <p className="mt-1 text-xs text-slate-400">
+            気づいたこと・言われたこと・体調など、なんでも。この端末の中だけに保存されます。
+          </p>
+        </section>
+      )}
+
       {/* 今月のリスク概要 */}
       <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-baseline justify-between">
@@ -169,6 +182,36 @@ export default function Home() {
           </Link>
         </div>
       </section>
+    </div>
+  )
+}
+
+/** 自由メモ。入力中はローカル状態で保持し、フォーカスが外れたときに保存する */
+function MemoField({ day }: { day: WorkDay }) {
+  const [text, setText] = useState(day.memo)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setText(day.memo)
+  }, [day.date, day.memo])
+
+  const save = async () => {
+    if (text === day.memo) return
+    await saveWorkDay({ ...day, memo: text })
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <div>
+      <textarea
+        className="input min-h-24"
+        placeholder="今日の出来事を自由に記録できます"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+      />
+      {saved && <p className="mt-1 text-xs text-emerald-600">保存しました</p>}
     </div>
   )
 }
