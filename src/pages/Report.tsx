@@ -105,6 +105,12 @@ export default function Report() {
 
       <MonthlyInputCard month={month} selfOvertimeMinutes={agg.overtimeMinutes} />
 
+      <Link
+        to={`/print/${month}`}
+        className="block w-full rounded-xl bg-brand py-3 text-center font-bold text-white"
+      >
+        相談用レポートを作成(PDF保存)
+      </Link>
       <button
         onClick={downloadCsv}
         className="w-full rounded-xl border border-brand bg-white py-3 font-bold text-brand"

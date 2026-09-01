@@ -8,6 +8,7 @@ import Incidents from './pages/Incidents'
 import IncidentNew from './pages/IncidentNew'
 import Calendar from './pages/Calendar'
 import Report from './pages/Report'
+import PrintReport from './pages/PrintReport'
 import Risk from './pages/Risk'
 import Consult from './pages/Consult'
 import Evidence from './pages/Evidence'
@@ -29,7 +30,7 @@ export default function App() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col">
-      <main className="flex-1 px-4 pb-24 pt-4">
+      <main className="flex-1 px-4 pb-24 pt-4 print:p-0">
         {profile === null ? (
           // 未設定の間はURLを変えずに常にセットアップを表示する
           // (保存直後の liveQuery 反映前にリダイレクトで往復しないため)
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/incident/new" element={<IncidentNew />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/report/:month" element={<Report />} />
+            <Route path="/print/:month" element={<PrintReport />} />
             <Route path="/risk" element={<Risk />} />
             <Route path="/consult" element={<Consult />} />
             <Route path="/evidence" element={<Evidence />} />
@@ -52,7 +54,7 @@ export default function App() {
         )}
       </main>
       {profile !== null && (
-        <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 backdrop-blur">
+        <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 backdrop-blur print:hidden">
           <div className="mx-auto flex max-w-lg justify-around">
             {NAV_ITEMS.map((item) => (
               <NavLink
