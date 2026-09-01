@@ -3,20 +3,52 @@ import { Link } from 'react-router-dom'
 import { deleteAll, exportAll, importAll, type BackupData } from '../db'
 import rules from '../scoring/rules.json'
 
+async function makeBackupFile(): Promise<File> {
+  const data = await exportAll()
+  return new File(
+    [JSON.stringify(data, null, 2)],
+    `mamolog-backup-${data.exportedAt.slice(0, 10)}.json`,
+    { type: 'application/json' },
+  )
+}
+
 export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState('')
+  const [showShareFallback, setShowShareFallback] = useState(false)
 
   const doExport = async () => {
-    const data = await exportAll()
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
+    const file = await makeBackupFile()
+    const url = URL.createObjectURL(file)
     const a = document.createElement('a')
     a.href = url
-    a.download = `mamolog-backup-${data.exportedAt.slice(0, 10)}.json`
+    a.download = file.name
     a.click()
     URL.revokeObjectURL(url)
     setMessage('バックアップをダウンロードしました。安全な場所に保管してください。')
+  }
+
+  // メール添付・Googleドライブ保存など、OSの共有機能にファイルを渡す
+  const doShare = async () => {
+    const file = await makeBackupFile()
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'まもログ バックアップ',
+        })
+        setMessage('共有先(メール・Googleドライブなど)にバックアップを渡しました。')
+      } catch (e) {
+        // 共有シートのキャンセルはエラー扱いしない
+        if (e instanceof Error && e.name !== 'AbortError') {
+          setShowShareFallback(true)
+        }
+      }
+    } else {
+      // 共有非対応ブラウザ(主にPC):ダウンロード+手動添付の案内を表示
+      await doExport()
+      setShowShareFallback(true)
+    }
   }
 
   const doImport = async (file: File) => {
@@ -55,7 +87,7 @@ export default function Settings() {
       </section>
 
       <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-bold">バックアップ</h2>
+        <h2 className="text-sm font-bold">データのエクスポート(バックアップ)</h2>
         <p className="text-xs text-slate-600">
           データはこの端末のブラウザ内にのみ保存されています。端末の故障やブラウザのデータ削除で失われるため、定期的なバックアップをおすすめします。
         </p>
@@ -63,18 +95,64 @@ export default function Settings() {
           onClick={doExport}
           className="w-full rounded-xl border border-brand bg-white py-2.5 text-sm font-bold text-brand"
         >
-          JSONバックアップをダウンロード
+          ファイルをダウンロード
         </button>
+        <button
+          onClick={doShare}
+          className="w-full rounded-xl border border-brand bg-white py-2.5 text-sm font-bold text-brand"
+        >
+          メール・Googleドライブ等に送る
+        </button>
+        <p className="text-xs text-slate-500">
+          スマートフォンでは共有画面が開き、Gmailへの添付やGoogleドライブへの保存を選べます。
+        </p>
+        {showShareFallback && (
+          <div className="space-y-1.5 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+            <p className="font-medium text-slate-700">
+              このブラウザはファイルの直接共有に対応していないため、ダウンロードしたファイルを手動で添付・アップロードしてください。
+            </p>
+            <p>
+              1. 上の「ファイルをダウンロード」でバックアップを保存
+              <br />
+              2. メールに添付して自分宛てに送る、またはGoogleドライブにアップロード
+            </p>
+            <p className="space-x-3">
+              <a
+                href="https://mail.google.com/mail/?view=cm&fs=1&su=%E3%81%BE%E3%82%82%E3%83%AD%E3%82%B0%20%E3%83%90%E3%83%83%E3%82%AF%E3%82%A2%E3%83%83%E3%83%97"
+                target="_blank"
+                rel="noreferrer"
+                className="text-brand underline"
+              >
+                Gmailを開く
+              </a>
+              <a
+                href="https://drive.google.com/drive/my-drive"
+                target="_blank"
+                rel="noreferrer"
+                className="text-brand underline"
+              >
+                Googleドライブを開く
+              </a>
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-bold">データのインポート(復元)</h2>
+        <p className="text-xs text-slate-600">
+          エクスポートしたバックアップファイル(mamolog-backup-〇〇.json)から復元します。メールの添付ファイルやGoogleドライブからは、いったん端末にダウンロードしてから選択してください。
+        </p>
         <button
           onClick={() => fileRef.current?.click()}
           className="w-full rounded-xl border border-slate-300 bg-white py-2.5 text-sm font-medium"
         >
-          バックアップから復元
+          バックアップファイルを選んで復元
         </button>
         <input
           ref={fileRef}
           type="file"
-          accept="application/json"
+          accept=".json,application/json,text/plain"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0]
@@ -82,6 +160,9 @@ export default function Settings() {
             e.target.value = ''
           }}
         />
+        <p className="text-xs text-amber-700">
+          復元すると、この端末の現在のデータはバックアップの内容にすべて置き換わります。
+        </p>
       </section>
 
       <section className="space-y-3 rounded-2xl bg-white p-5 shadow-sm">
