@@ -3,8 +3,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
   HARASSMENT_CATEGORIES,
+  LEAVE_ITEMS,
   SEVERITY_OPTIONS,
   TROUBLE_ITEMS,
+  normalizeMonthlyInput,
   type AuditEntry,
   type Incident,
   type WorkDay,
@@ -31,7 +33,8 @@ export default function PrintReport() {
     [month],
   )
   const input = useLiveQuery(
-    async () => (month ? ((await db.monthlyInputs.get(month)) ?? null) : null),
+    async () =>
+      month ? normalizeMonthlyInput((await db.monthlyInputs.get(month)) ?? null) : null,
     [month],
   )
   const audits = useLiveQuery(
@@ -108,8 +111,19 @@ export default function PrintReport() {
             <SummaryRow label="休憩不足の日数(労基法34条の一般則を目安)" value={`${agg.breakDeficitDays}日`} />
             <SummaryRow label="休日勤務" value={`${agg.holidayWorkDays}日`} />
             <SummaryRow label="深夜勤務(22時〜5時)" value={`${agg.nightWorkDays}日`} />
+            {input?.paidLeaveDays != null && (
+              <SummaryRow label="取得した有給休暇(本人入力)" value={`${input.paidLeaveDays}日`} />
+            )}
           </tbody>
         </table>
+        {(input?.leaveFlags.length ?? 0) > 0 && (
+          <p className="mt-1 text-[11px]">
+            有給休暇に関する特記(本人申告):
+            {input!.leaveFlags
+              .map((f) => LEAVE_ITEMS.find((i) => i.id === f)?.label ?? f)
+              .join('、')}
+          </p>
+        )}
       </section>
 
       {(diff !== null || payslipDiff !== null) && (

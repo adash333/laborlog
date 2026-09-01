@@ -4,6 +4,7 @@ import { db } from '../db'
 import { localDateString, monthOf } from '../lib/time'
 import { aggregateMonth } from '../lib/aggregate'
 import { assessMonth } from '../scoring/scoring'
+import { normalizeMonthlyInput } from '../types'
 
 const SECTIONS = [
   {
@@ -83,7 +84,7 @@ export default function Consult() {
   // スコア条件による優先表示(実装仕様書 §31)。窓口の選択は本人に委ねる
   const relevant = new Set<string>()
   if (days !== undefined && incidents !== undefined && monthlyInput !== undefined) {
-    const risk = assessMonth(aggregateMonth(month, days), incidents, monthlyInput)
+    const risk = assessMonth(aggregateMonth(month, days), incidents, normalizeMonthlyInput(monthlyInput))
     if (risk.longHours.score >= 10 || risk.unpaid.score >= 10) relevant.add('working_hours')
     if (risk.harassment.score >= 5) relevant.add('harassment')
     if (risk.pressure.score >= 4) relevant.add('employment')

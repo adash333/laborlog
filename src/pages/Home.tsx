@@ -3,7 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
 import type { WorkDay } from '../types'
 import { db, saveWorkDay } from '../db'
-import { TROUBLE_ITEMS, emptyWorkDay, type TroubleId } from '../types'
+import {
+  TROUBLE_ITEMS,
+  emptyWorkDay,
+  normalizeMonthlyInput,
+  type TroubleId,
+} from '../types'
 import {
   formatMinutes,
   localDateString,
@@ -12,7 +17,7 @@ import {
   recordedWorkMinutes,
   weekdayLabel,
 } from '../lib/time'
-import { aggregateMonth } from '../lib/aggregate'
+import { aggregateMonth, overtimeHistoryByMonth } from '../lib/aggregate'
 import { LEVEL_LABELS, assessMonth } from '../scoring/scoring'
 import ScoreBar from '../components/ScoreBar'
 
@@ -40,17 +45,24 @@ export default function Home() {
     async () => (await db.monthlyInputs.get(month)) ?? null,
     [month],
   )
+  const allDays = useLiveQuery(() => db.workdays.toArray(), [])
 
   if (
     day === undefined ||
     monthDays === undefined ||
     monthIncidents === undefined ||
-    monthlyInput === undefined
+    monthlyInput === undefined ||
+    allDays === undefined
   )
     return null
 
   const agg = aggregateMonth(month, monthDays)
-  const risk = assessMonth(agg, monthIncidents, monthlyInput)
+  const risk = assessMonth(
+    agg,
+    monthIncidents,
+    normalizeMonthlyInput(monthlyInput),
+    overtimeHistoryByMonth(allDays),
+  )
   const levelInfo = LEVEL_LABELS[risk.screenLevel]
   const work = day ? recordedWorkMinutes(day) : null
 

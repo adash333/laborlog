@@ -3,9 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
+  LEAVE_ITEMS,
   PRESSURE_ITEMS,
   TROUBLE_ITEMS,
   emptyMonthlyInput,
+  normalizeMonthlyInput,
+  type LeaveItemId,
   type MonthlyInput,
   type PressureItemId,
   type WorkDay,
@@ -139,7 +142,8 @@ function MonthlyInputCard({
   const [input, setInput] = useState<MonthlyInput | null>(null)
 
   useEffect(() => {
-    if (stored !== undefined) setInput(stored ?? emptyMonthlyInput(month))
+    if (stored !== undefined)
+      setInput(normalizeMonthlyInput(stored) ?? emptyMonthlyInput(month))
   }, [stored, month])
 
   if (!input) return null
@@ -154,6 +158,13 @@ function MonthlyInputCard({
       ? input.pressureFlags.filter((f) => f !== id)
       : [...input.pressureFlags, id]
     save({ ...input, pressureFlags: flags })
+  }
+
+  const toggleLeave = (id: LeaveItemId) => {
+    const flags = input.leaveFlags.includes(id)
+      ? input.leaveFlags.filter((f) => f !== id)
+      : [...input.leaveFlags, id]
+    save({ ...input, leaveFlags: flags })
   }
 
   const selfH = Math.floor(selfOvertimeMinutes / 60)
@@ -212,6 +223,40 @@ function MonthlyInputCard({
             計算方法や勤務条件を確認してください(この表示は未払いを断定するものではありません)。
           </p>
         )}
+      </section>
+
+      <section className="space-y-2 rounded-2xl bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-bold">有給休暇について(この月に該当があればチェック)</h2>
+        <div className="space-y-1.5">
+          {LEAVE_ITEMS.map((item) => (
+            <label key={item.id} className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={input.leaveFlags.includes(item.id)}
+                onChange={() => toggleLeave(item.id)}
+              />
+              {item.label}
+            </label>
+          ))}
+        </div>
+        <label className="block pt-1">
+          <span className="mb-1 block text-xs font-medium">この月に取得した有休(日数・任意)</span>
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            className="input"
+            placeholder="未入力"
+            value={input.paidLeaveDays ?? ''}
+            onChange={(e) =>
+              save({ ...input, paidLeaveDays: e.target.value === '' ? null : Number(e.target.value) })
+            }
+          />
+        </label>
+        <p className="text-xs text-slate-500">
+          年次有給休暇は労働基準法で定められた権利です。断られた場合は、日時とやり取りを出来事メモに残しておきましょう。
+        </p>
       </section>
 
       <section className="space-y-2 rounded-2xl bg-white p-5 shadow-sm">

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { addMonths, localDateString, monthOf } from '../lib/time'
-import { aggregateMonth, dataConfidence } from '../lib/aggregate'
+import { aggregateMonth, dataConfidence, overtimeHistoryByMonth } from '../lib/aggregate'
+import { normalizeMonthlyInput } from '../types'
 import { LEVEL_LABELS, assessMonth, type CategoryScore } from '../scoring/scoring'
 import ScoreBar from '../components/ScoreBar'
 import rules from '../scoring/rules.json'
@@ -20,10 +21,21 @@ export default function Risk() {
     [month],
   )
   const profile = useLiveQuery(() => db.profile.get(1), [])
+  const allDays = useLiveQuery(() => db.workdays.toArray(), [])
 
-  if (days === undefined || incidents === undefined || monthlyInput === undefined) return null
+  if (
+    days === undefined ||
+    incidents === undefined ||
+    monthlyInput === undefined ||
+    allDays === undefined
+  )
+    return null
   const agg = aggregateMonth(month, days)
-  const risk = assessMonth(agg, incidents, monthlyInput)
+  const history = overtimeHistoryByMonth(allDays)
+  const risk = assessMonth(agg, incidents, normalizeMonthlyInput(monthlyInput), history)
+  const recentMonths = Array.from({ length: 6 }, (_, i) => addMonths(month, -i)).filter(
+    (m) => (history[m] ?? 0) > 0 || m === month,
+  )
   const levelInfo = LEVEL_LABELS[risk.screenLevel]
   const confidence = dataConfidence(agg.recordedDays)
   const hasScheduleException =
@@ -103,6 +115,30 @@ export default function Risk() {
           該当項目をチェックする →
         </Link>
       </CategoryCard>
+
+      {recentMonths.length >= 2 && (
+        <section className="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="mb-2 text-sm font-bold">月別の推定時間外労働(直近)</h2>
+          <ul className="space-y-1 text-sm">
+            {recentMonths.map((m) => {
+              const h = (history[m] ?? 0) / 60
+              return (
+                <li key={m} className="flex justify-between">
+                  <span>
+                    {Number(m.slice(0, 4))}年{Number(m.slice(5, 7))}月
+                  </span>
+                  <span className={`tabular-nums ${h >= 80 ? 'font-bold text-red-600' : h >= 45 ? 'text-amber-600' : 'text-slate-600'}`}>
+                    約{Math.floor(h)}時間
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500">
+            2〜6か月平均で月80時間超、または月45時間超が年7か月以上になると、総合点とは別に注意を表示します。
+          </p>
+        </section>
+      )}
 
       <section className="rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="mb-2 text-sm font-bold">なぜこの点数?</h2>

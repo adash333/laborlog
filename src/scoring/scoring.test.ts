@@ -102,6 +102,99 @@ describe('breaksHolidaysScore(実装仕様書 §23–24)', () => {
   })
 })
 
+describe('breaksHolidaysScore:有給休暇関連(実装仕様書 §25)', () => {
+  it('チェック項目の点数と上限3点', () => {
+    const one = { ...emptyMonthlyInput('2026-09'), leaveFlags: ['leave_evaluation_threat' as const] }
+    expect(breaksHolidaysScore(agg(), one).score).toBe(1)
+    const all = {
+      ...emptyMonthlyInput('2026-09'),
+      leaveFlags: [
+        'leave_refused' as const,
+        'leave_evaluation_threat' as const,
+        'leave_harassment' as const,
+      ],
+    }
+    expect(breaksHolidaysScore(agg(), all).score).toBe(3) // 5点相当 → 上限3
+  })
+
+  it('休憩不足・連勤との合算でもDは15点まで', () => {
+    const input = {
+      ...emptyMonthlyInput('2026-09'),
+      leaveFlags: ['leave_refused' as const, 'leave_harassment' as const],
+    }
+    const result = breaksHolidaysScore(
+      agg({ breakDeficitDays: 12, maxConsecutiveDays: 14 }),
+      input,
+    )
+    expect(result.score).toBe(15)
+  })
+
+  it('入力なしなら従来どおり', () => {
+    expect(breaksHolidaysScore(agg(), null).score).toBe(0)
+  })
+})
+
+describe('evaluateMultiMonthRedFlags(実装仕様書 §11)', () => {
+  it('直近2〜6か月平均80時間以上でクリティカル(RF_LONG_002)', () => {
+    const history = { '2026-09': 85 * 60, '2026-08': 82 * 60 }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    expect(flags.some((f) => f.ruleId === 'RF_LONG_002' && f.severity === 'critical')).toBe(true)
+  })
+
+  it('6か月平均で80時間以上も検出する', () => {
+    const history: Record<string, number> = {
+      '2026-09': 80 * 60,
+      '2026-08': 80 * 60,
+      '2026-07': 79 * 60,
+      '2026-06': 81 * 60,
+      '2026-05': 80 * 60,
+      '2026-04': 80 * 60,
+    }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    expect(flags.some((f) => f.ruleId === 'RF_LONG_002')).toBe(true)
+  })
+
+  it('当月しか記録がない場合は平均判定しない', () => {
+    const history = { '2026-09': 90 * 60 }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    expect(flags.some((f) => f.ruleId === 'RF_LONG_002')).toBe(false)
+  })
+
+  it('月初で当月が少なくても、前月までの2か月平均80時間超を検出する', () => {
+    const history = { '2026-09': 4 * 60, '2026-08': 88 * 60, '2026-07': 88 * 60 }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    const rf = flags.filter((f) => f.ruleId === 'RF_LONG_002')
+    expect(rf).toHaveLength(1) // 重複して2件は出さない
+    expect(rf[0].severity).toBe('critical')
+  })
+
+  it('平均が80時間未満なら出さない', () => {
+    const history = { '2026-09': 70 * 60, '2026-08': 60 * 60 }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    expect(flags.some((f) => f.ruleId === 'RF_LONG_002')).toBe(false)
+  })
+
+  it('直近12か月で月45時間超が7か月以上ならhigh(RF_LONG_003)', () => {
+    const history: Record<string, number> = {}
+    for (let i = 0; i < 7; i++) {
+      const m = new Date(2026, 8 - i, 1)
+      history[`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`] = 50 * 60
+    }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    expect(flags.some((f) => f.ruleId === 'RF_LONG_003' && f.severity === 'high')).toBe(true)
+  })
+
+  it('45時間超が6か月以内なら出さない', () => {
+    const history: Record<string, number> = {}
+    for (let i = 0; i < 6; i++) {
+      const m = new Date(2026, 8 - i, 1)
+      history[`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`] = 50 * 60
+    }
+    const flags = evaluateRedFlags(agg(), [], null, history)
+    expect(flags.some((f) => f.ruleId === 'RF_LONG_003')).toBe(false)
+  })
+})
+
 describe('unpaidScore(実装仕様書 §12–15)', () => {
   it('会社勤怠が未入力なら差分は判定せず暫定値', () => {
     const result = unpaidScore(agg({ overtimeMinutes: 30 * 60 }), null)

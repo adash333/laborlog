@@ -4,11 +4,14 @@ import rules from './rules.json'
 import type { MonthlyAggregate } from '../lib/aggregate'
 import {
   HARASSMENT_CATEGORIES,
+  LEAVE_ITEMS,
   PRESSURE_ITEMS,
   type Incident,
+  type LeaveItemId,
   type MonthlyInput,
   type PressureItemId,
 } from '../types'
+import { addMonths } from '../lib/time'
 
 export interface ScoreReason {
   label: string
@@ -96,8 +99,11 @@ function longHoursMessage(score: number): string {
   return '現在の記録からは、長時間労働について大きなリスクは検出されていません。'
 }
 
-/** D:休憩・休日(0〜15。有休関連の自己申告は今後のスプリントで追加) */
-export function breaksHolidaysScore(agg: MonthlyAggregate): CategoryScore {
+/** D:休憩・休日・休暇(0〜15。実装仕様書 §22–25) */
+export function breaksHolidaysScore(
+  agg: MonthlyAggregate,
+  input: MonthlyInput | null = null,
+): CategoryScore {
   const cfg = rules.breaksHolidays
   const reasons: ScoreReason[] = []
 
@@ -108,16 +114,30 @@ export function breaksHolidaysScore(agg: MonthlyAggregate): CategoryScore {
   if (consecutiveScore > 0)
     reasons.push({ label: `連続勤務 ${agg.maxConsecutiveDays}日`, points: consecutiveScore })
 
-  const score = Math.min(cfg.maxScore, breakScore + consecutiveScore)
-  return { score, maxScore: cfg.maxScore, reasons, message: breaksMessage(score, agg) }
+  // 有給休暇関連(月次チェック。最大3点:§25)
+  const leavePoints = cfg.leaveItemPoints as Record<LeaveItemId, number>
+  let leaveScore = 0
+  for (const flag of input?.leaveFlags ?? []) {
+    const points = leavePoints[flag] ?? 0
+    if (points > 0 && leaveScore < cfg.leaveMaxScore) {
+      const added = Math.min(points, cfg.leaveMaxScore - leaveScore)
+      leaveScore += added
+      reasons.push({ label: LEAVE_ITEMS.find((i) => i.id === flag)?.label ?? flag, points: added })
+    }
+  }
+
+  const score = Math.min(cfg.maxScore, breakScore + consecutiveScore + leaveScore)
+  return { score, maxScore: cfg.maxScore, reasons, message: breaksMessage(score, agg, leaveScore) }
 }
 
-function breaksMessage(score: number, agg: MonthlyAggregate): string {
+function breaksMessage(score: number, agg: MonthlyAggregate, leaveScore: number): string {
   if (score >= 8)
-    return '休憩や休日が十分に取れていない状態が続いています。記録を保存し、勤務条件の確認や相談を検討してください。'
+    return '休憩・休日・休暇が十分に取れていない状態が続いています。記録を保存し、勤務条件の確認や相談を検討してください。'
+  if (leaveScore >= 2)
+    return '有給休暇の取得を妨げられた可能性のある出来事が記録されています。年次有給休暇は労働基準法で定められた権利です。経緯を出来事メモに残しておきましょう。'
   if (score >= 4)
     return '休憩不足または連続勤務が複数回記録されています。労働基準法の一般則では、6時間超の勤務に45分以上、8時間超の勤務に60分以上の休憩が必要とされています。'
-  if (score >= 1) return '休憩が不足した日があります。記録を継続しましょう。'
+  if (score >= 1) return '休憩・休暇について気になる記録があります。記録を継続しましょう。'
   if (agg.breakUnknownDays > 0)
     return '休憩が未入力の日があります。退勤時に休憩も記録すると、より正確に判定できます。'
   return '現在の記録からは、休憩・休日について大きなリスクは検出されていません。'
@@ -272,6 +292,7 @@ export function evaluateRedFlags(
   agg: MonthlyAggregate,
   incidents: Incident[] = [],
   input: MonthlyInput | null = null,
+  overtimeHistory: Record<string, number> | null = null,
 ): RedFlag[] {
   const metrics: Record<string, number> = {
     monthly_overtime_hours: agg.overtimeMinutes / 60,
@@ -296,6 +317,11 @@ export function evaluateRedFlags(
   if (flags.some((f) => f.ruleId === 'RF_LONG_001')) {
     const i = flags.findIndex((f) => f.ruleId === 'RF_LONG_080')
     if (i >= 0) flags.splice(i, 1)
+  }
+
+  // 複数月データを使ったレッドフラッグ(実装仕様書 §11 RF_LONG_002 / RF_LONG_003)
+  if (overtimeHistory) {
+    flags.push(...evaluateMultiMonthRedFlags(agg.month, overtimeHistory))
   }
 
   const harassmentSource = rules.sources.find((s) => s.id === 'mhlw_harassment')
@@ -343,18 +369,72 @@ export function evaluateRedFlags(
   return flags
 }
 
+/**
+ * 複数月の推定時間外労働からレッドフラッグを判定する。
+ * overtimeHistory は「YYYY-MM」→月間推定時間外(分)。記録のない月は0として扱う(保守的)。
+ */
+export function evaluateMultiMonthRedFlags(
+  currentMonth: string,
+  overtimeHistory: Record<string, number>,
+): RedFlag[] {
+  const flags: RedFlag[] = []
+  const cfg = rules.multiMonth
+  const source = rules.sources.find((s) => s.id === 'mhlw_rousai_kijun')
+  const hoursOf = (month: string) => (overtimeHistory[month] ?? 0) / 60
+
+  // 直近2〜6か月平均で月80時間超(労災認定基準の目安の一つ)。
+  // 当月が始まったばかりだと平均が薄まるため、当月末尾の窓に加えて前月末尾の窓でも判定する。
+  outer: for (const endMonth of [currentMonth, addMonths(currentMonth, -1)]) {
+    for (let n = cfg.avgOvertime.minMonths; n <= cfg.avgOvertime.maxMonths; n++) {
+      const months = Array.from({ length: n }, (_, i) => addMonths(endMonth, -i))
+      // 記録のある月が2か月未満の期間では判定しない
+      if (months.filter((m) => (overtimeHistory[m] ?? 0) > 0).length < 2) continue
+      const avg = months.reduce((sum, m) => sum + hoursOf(m), 0) / n
+      if (avg >= cfg.avgOvertime.thresholdHours) {
+        flags.push({
+          ruleId: 'RF_LONG_002',
+          severity: 'critical',
+          message: `直近${n}か月(${Number(months[months.length - 1].slice(5, 7))}月〜${Number(endMonth.slice(5, 7))}月)の推定時間外労働の平均が月${Math.floor(avg)}時間です。厚生労働省の脳・心臓疾患の労災認定基準では、発症前2〜6か月平均で月80時間を超える時間外労働は業務との関連性が強いと評価される目安の一つです。記録を保存し、早めの外部相談を検討してください。`,
+          sourceName: source?.name ?? '',
+          sourceUrl: source?.url ?? '',
+        })
+        break outer
+      }
+    }
+  }
+
+  // 直近12か月で月45時間超が7か月以上(一般則では45時間超は年6か月まで)
+  const window = Array.from({ length: cfg.over45Overtime.windowMonths }, (_, i) =>
+    addMonths(currentMonth, -i),
+  )
+  const over45Count = window.filter((m) => hoursOf(m) > cfg.over45Overtime.thresholdHours).length
+  if (over45Count > cfg.over45Overtime.maxAllowedMonths) {
+    const overtimeSource = rules.sources.find((s) => s.id === 'mhlw_overtime_limit')
+    flags.push({
+      ruleId: 'RF_LONG_003',
+      severity: 'high',
+      message: `直近12か月のうち${over45Count}か月で、推定時間外労働が月45時間を超えています。時間外労働の上限規制の一般則では、月45時間を超えられるのは年6か月までとされています(36協定・勤務制度等により扱いは異なります)。勤務条件を確認し、相談を検討してください。`,
+      sourceName: overtimeSource?.name ?? '',
+      sourceUrl: overtimeSource?.url ?? '',
+    })
+  }
+
+  return flags
+}
+
 /** 月次のリスク評価をまとめて計算する(§27–30) */
 export function assessMonth(
   agg: MonthlyAggregate,
   incidents: Incident[] = [],
   input: MonthlyInput | null = null,
+  overtimeHistory: Record<string, number> | null = null,
 ): RiskAssessment {
   const longHours = longHoursScore(agg)
   const unpaid = unpaidScore(agg, input)
   const harassment = harassmentScore(incidents)
-  const breaksHolidays = breaksHolidaysScore(agg)
+  const breaksHolidays = breaksHolidaysScore(agg, input)
   const pressure = pressureScore(agg, input)
-  const redFlags = evaluateRedFlags(agg, incidents, input)
+  const redFlags = evaluateRedFlags(agg, incidents, input, overtimeHistory)
 
   const totalScore = Math.min(
     100,

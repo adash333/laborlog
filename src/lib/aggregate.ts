@@ -3,6 +3,7 @@ import {
   breakDeficitMinutes,
   dailyOvertimeMinutes,
   isNightWork,
+  monthOf,
   recordedWorkMinutes,
 } from './time'
 
@@ -109,6 +110,16 @@ function isNextDay(a: string, b: string): boolean {
   const next = new Date(y, m - 1, d + 1)
   const nextStr = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
   return nextStr === b
+}
+
+/** 全勤務記録から月別の推定時間外労働(分)を集計する(複数月レッドフラッグ用) */
+export function overtimeHistoryByMonth(days: WorkDay[]): Record<string, number> {
+  const history: Record<string, number> = {}
+  for (const day of days) {
+    const m = monthOf(day.date)
+    history[m] = (history[m] ?? 0) + dailyOvertimeMinutes(day)
+  }
+  return history
 }
 
 /** データ信頼度(実装仕様書 §38 の簡易版:MVPでは記録日数のみで判定) */

@@ -131,12 +131,23 @@ export const PRESSURE_ITEMS = [
 
 export type PressureItemId = (typeof PRESSURE_ITEMS)[number]['id']
 
-// 月次入力(会社側の記録との比較・雇用上の圧力チェック)
+// 有給休暇関連のチェック項目(実装仕様書 §25)
+export const LEAVE_ITEMS = [
+  { id: 'leave_refused', label: '有休の申請を断られた・取得を妨げられた' },
+  { id: 'leave_evaluation_threat', label: '「有休を取ると評価が下がる」などと言われた' },
+  { id: 'leave_harassment', label: '有休の取得を理由に嫌がらせ・不利益な扱いを受けた' },
+] as const
+
+export type LeaveItemId = (typeof LEAVE_ITEMS)[number]['id']
+
+// 月次入力(会社側の記録との比較・雇用上の圧力・有給休暇チェック)
 export interface MonthlyInput {
   month: string // "YYYY-MM"(主キー)
   companyOvertimeHours: number | null // 会社の勤怠上の残業時間
   payslipOvertimeHours: number | null // 給与明細に記載された残業時間
   pressureFlags: PressureItemId[]
+  leaveFlags: LeaveItemId[]
+  paidLeaveDays: number | null // この月に取得した有休日数(記録用・任意)
   updatedAt: string
 }
 
@@ -146,6 +157,19 @@ export function emptyMonthlyInput(month: string): MonthlyInput {
     companyOvertimeHours: null,
     payslipOvertimeHours: null,
     pressureFlags: [],
+    leaveFlags: [],
+    paidLeaveDays: null,
     updatedAt: new Date().toISOString(),
+  }
+}
+
+/** 旧バージョンで保存された月次入力に新フィールドの既定値を補う */
+export function normalizeMonthlyInput(input: MonthlyInput | null): MonthlyInput | null {
+  if (!input) return null
+  return {
+    ...input,
+    pressureFlags: input.pressureFlags ?? [],
+    leaveFlags: input.leaveFlags ?? [],
+    paidLeaveDays: input.paidLeaveDays ?? null,
   }
 }

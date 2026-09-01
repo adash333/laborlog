@@ -100,7 +100,25 @@
       { "minDays": 10, "score": 4 },
       { "minDays": 7, "score": 2 },
       { "minDays": 0, "score": 0 }
-    ]
+    ],
+    "leaveMaxScore": 3,
+    "leaveItemPoints": {
+      "leave_refused": 2,
+      "leave_evaluation_threat": 1,
+      "leave_harassment": 2
+    }
+  },
+  "multiMonth": {
+    "avgOvertime": {
+      "minMonths": 2,
+      "maxMonths": 6,
+      "thresholdHours": 80
+    },
+    "over45Overtime": {
+      "windowMonths": 12,
+      "thresholdHours": 45,
+      "maxAllowedMonths": 6
+    }
   },
   "redFlags": [
     {
