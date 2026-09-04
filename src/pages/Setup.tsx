@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { db } from '../db'
 import type { EmploymentType, IndustryException, Profile, WorkScheduleType } from '../types'
 
@@ -29,6 +29,7 @@ const INDUSTRY_OPTIONS: { value: IndustryException; label: string }[] = [
 export default function Setup() {
   const navigate = useNavigate()
   const [loaded, setLoaded] = useState(false)
+  const [isEdit, setIsEdit] = useState(false)
   const [form, setForm] = useState<Profile>({
     id: 1,
     employmentType: 'regular_employee',
@@ -44,7 +45,10 @@ export default function Setup() {
 
   useEffect(() => {
     db.profile.get(1).then((p) => {
-      if (p) setForm(p)
+      if (p) {
+        setForm(p)
+        setIsEdit(true)
+      }
       setLoaded(true)
     })
   }, [])
@@ -61,10 +65,30 @@ export default function Setup() {
 
   return (
     <div className="space-y-5">
+      {!isEdit && (
+        <section className="rounded-2xl bg-brand p-5 text-white">
+          <h1 className="text-2xl font-bold">まもログ</h1>
+          <p className="mt-1 text-sm font-medium">働いた記録が、あなたを守る。</p>
+          <p className="mt-2 text-xs leading-relaxed text-white/90">
+            毎日「出勤」「退勤」を押すだけで勤務を記録し、長時間労働・残業・ハラスメントなどの働き方のリスクを見える化。記録はこの端末の中だけに保存され、外部には送信されません。無料・登録不要です。
+          </p>
+          <p className="mt-3">
+            <Link
+              to="/guide"
+              className="inline-block rounded-full bg-white px-4 py-1.5 text-xs font-bold text-brand"
+            >
+              詳しい使い方はこちら →
+            </Link>
+          </p>
+        </section>
+      )}
+
       <header>
-        <h1 className="text-xl font-bold text-brand">勤務条件の登録</h1>
+        <h1 className="text-xl font-bold text-brand">
+          {isEdit ? '勤務条件の変更' : 'まずは勤務条件を登録'}
+        </h1>
         <p className="mt-1 text-sm text-slate-600">
-          あなたの所定勤務条件を登録します。すべての情報はこの端末の中だけに保存され、外部には送信されません。
+          あなたの所定勤務条件を登録します。だいたいで大丈夫、後から変更できます。
         </p>
       </header>
 
@@ -179,7 +203,7 @@ export default function Setup() {
         onClick={save}
         className="w-full rounded-xl bg-brand py-3 font-bold text-white active:bg-brand-light"
       >
-        保存してはじめる
+        {isEdit ? '保存する' : '保存してはじめる'}
       </button>
 
       <p className="text-xs text-slate-500">

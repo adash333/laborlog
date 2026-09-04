@@ -78,6 +78,9 @@ export default function Settings() {
       {message && <p className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{message}</p>}
 
       <section className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm">
+        <Link to="/guide" className="block px-5 py-3.5 text-sm font-medium">
+          使い方ガイド →
+        </Link>
         <Link to="/setup" className="block px-5 py-3.5 text-sm font-medium">
           勤務条件を変更する →
         </Link>

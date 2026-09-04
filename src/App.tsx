@@ -11,6 +11,7 @@ import Report from './pages/Report'
 import PrintReport from './pages/PrintReport'
 import Risk from './pages/Risk'
 import Consult from './pages/Consult'
+import Guide from './pages/Guide'
 import Evidence from './pages/Evidence'
 import Settings from './pages/Settings'
 
@@ -32,9 +33,12 @@ export default function App() {
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col">
       <main className="flex-1 px-4 pb-24 pt-4 print:p-0">
         {profile === null ? (
-          // 未設定の間はURLを変えずに常にセットアップを表示する
-          // (保存直後の liveQuery 反映前にリダイレクトで往復しないため)
-          <Setup />
+          // 未設定の間は使い方ページ以外セットアップを表示する
+          // (保存直後の liveQuery 反映前にリダイレクトで往復しないため、URLは変えない)
+          <Routes>
+            <Route path="/guide" element={<Guide />} />
+            <Route path="*" element={<Setup />} />
+          </Routes>
         ) : (
           <Routes>
             <Route path="/setup" element={<Setup />} />
@@ -48,6 +52,7 @@ export default function App() {
             <Route path="/risk" element={<Risk />} />
             <Route path="/consult" element={<Consult />} />
             <Route path="/evidence" element={<Evidence />} />
+            <Route path="/guide" element={<Guide />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
